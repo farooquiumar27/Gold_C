@@ -25,9 +25,9 @@ int main(int argc,char *argv[])
     Tokenizer _tokenizer(contents);
     std::vector<Token> tokens=_tokenizer.tokenize();
     Parser _parser(tokens);
-    std::optional<NodeExit> tree=_parser.parse();
-    Generator _generator(tree.value());
-    std::string data=_generator.generate();
+    std::optional<ProgNode> prog=_parser.parse_prog();
+    Generator _generator(prog.value());
+    std::string data=_generator.gen_prog();
     {
         std::fstream file("out.asm",std::ios::out);
         file<<data;

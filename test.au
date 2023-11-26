@@ -1,1 +1,6 @@
-exit 25;
+let x=10;
+let y=6;
+let d=8;
+let rf=99;
+let gg=d;
+exit(x);
