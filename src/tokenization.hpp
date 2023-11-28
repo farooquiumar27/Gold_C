@@ -4,7 +4,7 @@
 #include<string>
 #include<optional>
 #include<vector>
-enum class TokenType { exit, int_lit, semi ,open_paren ,close_paren , let, ident, eq};
+enum class TokenType { exit, int_lit, semi ,open_paren ,close_paren , let, ident, eq, plus};
 struct Token
 {
     TokenType type;
@@ -82,6 +82,12 @@ class Tokenizer
             else if(peek().value()==';')
             {
                 tokens.push_back({.type=TokenType::semi});
+                consume();
+                continue;
+            }
+            else if(peek().value()=='+')
+            {
+                tokens.push_back({.type=TokenType::plus});
                 consume();
                 continue;
             }

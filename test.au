@@ -3,4 +3,4 @@ let y=6;
 let d=8;
 let rf=99;
 let gg=d;
-exit(x);
+exit(x+y+d+rf+gg+100);

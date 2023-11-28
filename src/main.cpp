@@ -6,7 +6,7 @@
 #include "tokenization.hpp"
 #include "parse.hpp"
 #include "generation.hpp"
-
+#include "arena.hpp"
 int main(int argc,char *argv[])
 {
     if(argc!=2)
@@ -23,11 +23,17 @@ int main(int argc,char *argv[])
         contents=content_stream.str( );
     }
     Tokenizer _tokenizer(contents);
+    //std::cout<<"Tokenization started"<<std::endl;
     std::vector<Token> tokens=_tokenizer.tokenize();
+    //std::cout<<"Tokenization completed"<<std::endl;
     Parser _parser(tokens);
+    //std::cout<<"Parsing started"<<std::endl;
     std::optional<ProgNode> prog=_parser.parse_prog();
+    //std::cout<<"Parsing completed"<<std::endl;
     Generator _generator(prog.value());
+    //std::cout<<"Generation started"<<std::endl;
     std::string data=_generator.gen_prog();
+    //std::cout<<"Generation completed"<<std::endl;
     {
         std::fstream file("out.asm",std::ios::out);
         file<<data;
