@@ -34,9 +34,58 @@ class Generator
                 offset<<"QWORD [rsp + "<<(gen->m_stackSize-1-varInfo.stack_loc)*8<<"]\n";
                 gen->push(offset.str());
             }
+            void operator()(ParenTermNode *paren_term)
+            {
+                gen->gen_expr(paren_term->expr);
+            }
         };
         TermVisitor visitor {.gen=this};
         std::visit(visitor,term->var);
+    }
+    inline void gen_bin_expr(BinaryExprNode *binary_expr)
+    {
+        struct BinaryExprVisitor
+        {
+            Generator *gen;
+            void operator()(AddBinaryExprNode *add)
+            {
+                gen->gen_expr(add->lhs);
+                gen->gen_expr(add->rhs);
+                gen->pop("rbx");
+                gen->pop("rax");
+                gen->m_output<<"add rax, rbx\n";
+                gen->push("rax");
+            }
+            void operator()(SubBinaryExprNode *sub)
+            {
+                gen->gen_expr(sub->lhs);
+                gen->gen_expr(sub->rhs);
+                gen->pop("rbx");
+                gen->pop("rax");
+                gen->m_output<<"sub rax, rbx\n";
+                gen->push("rax");
+            }
+            void operator()(MultiBinaryExprNode *multi)
+            {
+                gen->gen_expr(multi->lhs);
+                gen->gen_expr(multi->rhs);
+                gen->pop("rbx");
+                gen->pop("rax");
+                gen->m_output<<"mul rbx\n";
+                gen->push("rax");
+            }
+            void operator()(DivBinaryExprNode *div)
+            {
+                gen->gen_expr(div->lhs);
+                gen->gen_expr(div->rhs);
+                gen->pop("rbx");
+                gen->pop("rax");
+                gen->m_output<<"div rbx\n";
+                gen->push("rax");
+            }
+        };
+        BinaryExprVisitor visitor {.gen=this};
+        std::visit(visitor,binary_expr->var);
     }
     inline void gen_expr(ExprNode *expr)
     {
@@ -49,12 +98,7 @@ class Generator
             }
             void operator()(BinaryExprNode *binary_expr)
             {
-                gen->gen_expr(binary_expr->add->lhs);
-                gen->gen_expr(binary_expr->add->rhs);
-                gen->pop("rax");
-                gen->pop("rbx");
-                gen->m_output<<"add rax, rbx\n";
-                gen->push("rax");
+                gen->gen_bin_expr(binary_expr);
             }
         };
         ExprVisitor visitor {.gen=this};

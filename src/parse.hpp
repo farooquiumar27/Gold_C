@@ -4,6 +4,7 @@
 #include<variant>
 #include "arena.hpp"
 struct BinaryExprNode;
+struct ExprNode;
 struct IntLitTermNode
 {
     Token int_lit;
@@ -12,9 +13,13 @@ struct IdentTermNode
 {
     Token ident;
 };
+struct ParenTermNode
+{
+    ExprNode *expr;
+};
 struct TermNode
 {
-    std::variant<IntLitTermNode*,IdentTermNode*> var;
+    std::variant<IntLitTermNode*,IdentTermNode*,ParenTermNode*> var;
 };
 struct ExprNode
 {
@@ -25,9 +30,24 @@ struct AddBinaryExprNode
     ExprNode *lhs;
     ExprNode *rhs;
 };
+struct MultiBinaryExprNode
+{
+    ExprNode *lhs;
+    ExprNode *rhs;
+};
+struct SubBinaryExprNode
+{
+    ExprNode *lhs;
+    ExprNode *rhs;
+};
+struct DivBinaryExprNode
+{
+    ExprNode *lhs;
+    ExprNode *rhs;
+};
 struct BinaryExprNode
 {
-    AddBinaryExprNode* add;
+    std::variant<AddBinaryExprNode*,MultiBinaryExprNode*,SubBinaryExprNode*,DivBinaryExprNode*> var;
 };
 
 struct ExitStmtNode
@@ -79,50 +99,111 @@ class Parser
             term->var=ident_term;
             return term;
         }
+        else if(peek().has_value() && peek().value().type==TokenType::open_paren)
+        {
+            consume();
+            TermNode *term;
+            term=m_allocator.alloc<TermNode>();
+            std::optional<ExprNode*> expr=parse_expr();
+            if(!expr.has_value())
+            {
+                std::cerr<<"Invalid term Expression"<<std::endl;
+                exit(EXIT_FAILURE);
+            }
+            try_comsume(TokenType::close_paren,"Expected '(' at the end of term expression");
+            ParenTermNode *paren_term;
+            paren_term=m_allocator.alloc<ParenTermNode>();
+            paren_term->expr=expr.value();
+            term->var=paren_term;
+            return term;
+        }
         else
         {
             return {};
         }
     }
-    inline std::optional<ExprNode*> parse_expr()
+    inline std::optional<ExprNode*> parse_expr(int min_prec=0)
     {
-        if( auto term=parse_term() )
+        std::optional<TermNode*> lhs_term=parse_term();
+        if(!lhs_term.has_value())
         {
-            ExprNode *expr;
-            expr=m_allocator.alloc<ExprNode>();
-            expr->var=term.value();
-            if(peek().has_value() && peek().value().type==TokenType::plus)
+            return {};
+        }
+        auto lhs_expr=m_allocator.alloc<ExprNode>();
+        lhs_expr->var=lhs_term.value();
+        
+        while(true)
+        {
+            std::optional<Token> cur_tok=peek();
+            std::optional<int> prec;
+            if(cur_tok.has_value())
             {
-                consume();
-                BinaryExprNode *binary_expr;
-                binary_expr=m_allocator.alloc<BinaryExprNode>();
-                AddBinaryExprNode *add_binary_expr;
-                add_binary_expr=m_allocator.alloc<AddBinaryExprNode>();
-                add_binary_expr->lhs=expr;
-                if(auto rhs=parse_expr())
+                prec=bin_prec(cur_tok->type);
+                if(!prec.has_value() ||  prec.value()<min_prec)
                 {
-                    add_binary_expr->rhs=rhs.value();
-                    binary_expr->add=add_binary_expr;
-                    ExprNode *_expr;
-                    _expr=m_allocator.alloc<ExprNode>();
-                    _expr->var=binary_expr;
-                    return _expr;
-                }
-                else
-                {
-                    std::cerr<<"Expected an expression after the operator '+'"<<std::endl;
-                    exit(EXIT_FAILURE);
+                    break;
                 }
             }
             else
             {
-                return expr;
+                    break;
+            }
+            Token op=consume();
+            int nxt_min_prec=prec.value()+1;
+            auto rsh_expr=parse_expr(nxt_min_prec);
+            if(!rsh_expr.has_value())
+            {
+                std::cerr<<"Unable to parse expression"<<std::endl;
+                exit(EXIT_FAILURE);
+            }
+            ExprNode *expr;
+            expr=m_allocator.alloc<ExprNode>();
+            BinaryExprNode* binary_expr;
+            binary_expr=m_allocator.alloc<BinaryExprNode>();
+            if(op.type==TokenType::plus)
+            {
+                expr->var=lhs_expr->var;
+                AddBinaryExprNode* add;
+                add=m_allocator.alloc<AddBinaryExprNode>();
+                add->lhs=expr;
+                add->rhs=rsh_expr.value();
+                binary_expr->var=add;
+                lhs_expr->var=binary_expr;
+            }
+            else if(op.type==TokenType::star)
+            {
+                expr->var=lhs_expr->var;
+                MultiBinaryExprNode* multi;
+                multi=m_allocator.alloc<MultiBinaryExprNode>();
+                multi->lhs=expr;
+                multi->rhs=rsh_expr.value();
+                binary_expr->var=multi;
+                lhs_expr->var=binary_expr;
+            }
+            else if(op.type==TokenType::sub)
+            {
+                expr->var=lhs_expr->var;
+                SubBinaryExprNode* sub;
+                sub=m_allocator.alloc<SubBinaryExprNode>();
+                sub->lhs=expr;
+                sub->rhs=rsh_expr.value();
+                binary_expr->var=sub;
+                lhs_expr->var=binary_expr;
+            }
+            else if(op.type==TokenType::div)
+            {
+                expr->var=lhs_expr->var;
+                DivBinaryExprNode* div;
+                div=m_allocator.alloc<DivBinaryExprNode>();
+                div->lhs=expr;
+                div->rhs=rsh_expr.value();
+                binary_expr->var=div;
+                lhs_expr->var=binary_expr;
             }
         }
-        else
-        {
-            return {};
-        }
+
+        return lhs_expr;
+        
     }
 
     inline std::optional<StmtNode *> parse_stmt()

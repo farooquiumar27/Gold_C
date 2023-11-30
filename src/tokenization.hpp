@@ -4,12 +4,20 @@
 #include<string>
 #include<optional>
 #include<vector>
-enum class TokenType { exit, int_lit, semi ,open_paren ,close_paren , let, ident, eq, plus};
+enum class TokenType { exit, int_lit, semi ,open_paren ,close_paren , let, ident, eq, plus, star ,sub ,div};
 struct Token
 {
     TokenType type;
     std::optional<std::string> value;
 };
+inline std::optional<int> bin_prec(TokenType type)
+{
+    if(type==TokenType::plus)return 0;
+    if(type==TokenType::sub)return 0;
+    if(type==TokenType::star)return 1;
+    if(type==TokenType::div)return 1;
+    return {};
+}
 class Tokenizer
 {
     public:
@@ -35,19 +43,16 @@ class Tokenizer
                 {
                     tokens.push_back({.type=TokenType::exit});
                     buf.clear();
-                    continue;
                 }
                 else if(buf=="let")
                 {
                     tokens.push_back({.type=TokenType::let});
                     buf.clear();
-                    continue;
                 }
                 else
                 {
                     tokens.push_back({.type=TokenType::ident ,.value=buf});
                     buf.clear();
-                    continue;
                 }
             }
             else if(std::isdigit(peek().value()))
@@ -59,42 +64,50 @@ class Tokenizer
                 }
                 tokens.push_back({.type=TokenType::int_lit ,.value=buf});
                 buf.clear();
-                continue;
             }
             else if(peek().value()=='(')
             {
                 tokens.push_back({.type=TokenType::open_paren});
                 consume();
-                continue;
             }
             else if(peek().value()==')')
             {
                 tokens.push_back({.type=TokenType::close_paren});
                 consume();
-                continue;
             }
             else if(peek().value()=='=')
             {
                 tokens.push_back({.type=TokenType::eq});
                 consume();
-                continue;
             }
             else if(peek().value()==';')
             {
                 tokens.push_back({.type=TokenType::semi});
                 consume();
-                continue;
             }
             else if(peek().value()=='+')
             {
                 tokens.push_back({.type=TokenType::plus});
                 consume();
-                continue;
+            }
+            else if(peek().value()=='*')
+            {
+                tokens.push_back({.type=TokenType::star});
+                consume();
+            }
+            else if(peek().value()=='-')
+            {
+                tokens.push_back({.type=TokenType::sub});
+                consume();
+            }
+            else if(peek().value()=='/')
+            {
+                tokens.push_back({.type=TokenType::div});
+                consume();
             }
             else if(std::isspace(peek().value()))
             {
                 consume();
-                continue;
             }
             else
             {
