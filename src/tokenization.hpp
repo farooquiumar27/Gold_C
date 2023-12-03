@@ -4,7 +4,7 @@
 #include<string>
 #include<optional>
 #include<vector>
-enum class TokenType { exit, int_lit, semi ,open_paren ,close_paren , let, ident, eq, plus, star ,sub ,div};
+enum class TokenType { exit, int_lit, semi ,open_paren ,close_paren , let, ident, eq, plus, star, minus, fslash, open_curly ,close_curly ,if_};
 struct Token
 {
     TokenType type;
@@ -13,9 +13,9 @@ struct Token
 inline std::optional<int> bin_prec(TokenType type)
 {
     if(type==TokenType::plus)return 0;
-    if(type==TokenType::sub)return 0;
+    if(type==TokenType::minus)return 0;
     if(type==TokenType::star)return 1;
-    if(type==TokenType::div)return 1;
+    if(type==TokenType::fslash)return 1;
     return {};
 }
 class Tokenizer
@@ -47,6 +47,11 @@ class Tokenizer
                 else if(buf=="let")
                 {
                     tokens.push_back({.type=TokenType::let});
+                    buf.clear();
+                }
+                else if(buf=="if")
+                {
+                    tokens.push_back({.type=TokenType::if_});
                     buf.clear();
                 }
                 else
@@ -97,12 +102,22 @@ class Tokenizer
             }
             else if(peek().value()=='-')
             {
-                tokens.push_back({.type=TokenType::sub});
+                tokens.push_back({.type=TokenType::minus});
                 consume();
             }
             else if(peek().value()=='/')
             {
-                tokens.push_back({.type=TokenType::div});
+                tokens.push_back({.type=TokenType::fslash});
+                consume();
+            }
+            else if(peek().value()=='{')
+            {
+                tokens.push_back({.type=TokenType::open_curly});
+                consume();
+            }
+            else if(peek().value()=='}')
+            {
+                tokens.push_back({.type=TokenType::close_curly});
                 consume();
             }
             else if(std::isspace(peek().value()))

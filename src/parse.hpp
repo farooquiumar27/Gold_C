@@ -5,6 +5,7 @@
 #include "arena.hpp"
 struct BinaryExprNode;
 struct ExprNode;
+struct StmtNode;
 struct IntLitTermNode
 {
     Token int_lit;
@@ -59,9 +60,18 @@ struct LetStmtNode
     Token ident;
     ExprNode *expr;
 };
+struct ScopeNode
+{
+    std::vector<StmtNode*> stmts;
+};
+struct IfStmtNode
+{
+    ExprNode *expr;
+    ScopeNode *scope;
+};
 struct StmtNode
 {
-    std::variant<ExitStmtNode*,LetStmtNode*> var;
+    std::variant<ExitStmtNode*,LetStmtNode*,ScopeNode*,IfStmtNode*> var;
 };
 struct ProgNode
 {
@@ -110,7 +120,7 @@ class Parser
                 std::cerr<<"Invalid term Expression"<<std::endl;
                 exit(EXIT_FAILURE);
             }
-            try_comsume(TokenType::close_paren,"Expected '(' at the end of term expression");
+            try_consume(TokenType::close_paren,"Expected '(' at the end of term expression");
             ParenTermNode *paren_term;
             paren_term=m_allocator.alloc<ParenTermNode>();
             paren_term->expr=expr.value();
@@ -180,7 +190,7 @@ class Parser
                 binary_expr->var=multi;
                 lhs_expr->var=binary_expr;
             }
-            else if(op.type==TokenType::sub)
+            else if(op.type==TokenType::minus)
             {
                 expr->var=lhs_expr->var;
                 SubBinaryExprNode* sub;
@@ -190,7 +200,7 @@ class Parser
                 binary_expr->var=sub;
                 lhs_expr->var=binary_expr;
             }
-            else if(op.type==TokenType::div)
+            else if(op.type==TokenType::fslash)
             {
                 expr->var=lhs_expr->var;
                 DivBinaryExprNode* div;
@@ -204,6 +214,24 @@ class Parser
 
         return lhs_expr;
         
+    }
+    inline std::optional<ScopeNode*> parse_scope()
+    {
+        if(peek().has_value() && peek().value().type==TokenType::open_curly)
+        {
+            consume();
+        }
+        else
+        {
+            return {};
+        }
+        auto scope=m_allocator.alloc<ScopeNode>();
+        while(auto stmt=parse_stmt())
+        {
+            scope->stmts.push_back(stmt.value());
+        }
+        try_consume(TokenType::close_curly,"Expected '}' at the end of scope");
+        return scope;
     }
 
     inline std::optional<StmtNode *> parse_stmt()
@@ -223,8 +251,8 @@ class Parser
                 std::cerr<<"Invalid Expression"<<std::endl;
                 exit(EXIT_FAILURE);
             }
-            try_comsume(TokenType::close_paren,"Excepted ')' ");
-            try_comsume(TokenType::semi,"Excepted ';' ");
+            try_consume(TokenType::close_paren,"Excepted ')' ");
+            try_consume(TokenType::semi,"Excepted ';' ");
             StmtNode *stmt_node;
             stmt_node=m_allocator.alloc<StmtNode>();
             stmt_node->var=exit_stmt_node;
@@ -245,11 +273,53 @@ class Parser
             {
                 std::cerr<<"Invalid expression"<<std::endl;
             }
-            try_comsume(TokenType::semi,"Excepted ';' ");
+            try_consume(TokenType::semi,"Excepted ';' ");
             StmtNode *stmt_node;
             stmt_node=m_allocator.alloc<StmtNode>();
             stmt_node->var=let_stmt_node;
             return stmt_node;
+        }
+        else if(peek().has_value() && peek().value().type==TokenType::open_curly)
+        {
+            if(auto scope=parse_scope())
+            {
+                auto stmt=m_allocator.alloc<StmtNode>();
+                stmt->var=scope.value();
+                return stmt;
+            }
+            else
+            {
+                std::cerr<<"Invalid scope"<<std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+        else if(peek().value().type==TokenType::if_)
+        {
+            consume();
+            try_consume(TokenType::open_paren,"Expected '(' for if statment");
+            IfStmtNode* if_stmt=m_allocator.alloc<IfStmtNode>();
+            if(auto expr=parse_expr())
+            {
+                if_stmt->expr=expr.value();
+            }
+            else
+            {
+                std::cerr<<"Invalid if expression"<<std::endl;
+                exit(EXIT_FAILURE);
+            }
+            try_consume(TokenType::close_paren,"Expected ')' for if statment");
+            if(auto scope=parse_scope())
+            {
+                if_stmt->scope=scope.value();
+                auto stmt=m_allocator.alloc<StmtNode>();
+                stmt->var=if_stmt;
+                return stmt;
+            }
+            else
+            {
+                std::cerr<<"Invalid scope for if statment"<<std::endl;
+                exit(EXIT_FAILURE);
+            }
         }
         else
         {
@@ -277,7 +347,7 @@ class Parser
 
     
     private:
-    inline Token try_comsume(TokenType type,std::string errmsg)
+    inline Token try_consume(TokenType type,std::string errmsg)
     {
         if(peek().has_value() && peek().value().type==type)
         {
